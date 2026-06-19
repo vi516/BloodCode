@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bloodcode OS V11</title>
+
+<style>
+  body { margin: 0; background: #03030a; color: #ff2b2b; font-family: monospace; padding-bottom: 50px; }
+  .header { text-align: center; padding: 15px; font-size: 24px; font-weight: bold; text-shadow: 0 0 5px #ff2b2b; background: #111; }
+  .nav-bar { display: flex; justify-content: space-around; background: #1a1a24; border-bottom: 2px solid #ff2b2b; padding: 10px 0; position: sticky; top: 0; z-index: 100; flex-wrap: wrap; }
+  .tab-btn { background: none; border: none; color: #888; font-family: monospace; font-size: 13px; font-weight: bold; cursor: pointer; padding: 8px 8px; transition: 0.3s ease; flex-grow: 1; }
+  .tab-btn.active { color: #ff2b2b; text-shadow: 0 0 5px #ff2b2b; border-bottom: 2px solid #ff2b2b; }
+  .tab-content { display: none; gap: 15px; padding: 15px; max-width: 420px; margin: auto; }
+  .tab-content.active { display: grid; }
+  .card { background: #111; border: 1px solid #ff2b2b; padding: 15px; border-radius: 8px; box-shadow: 0 0 10px rgba(255, 43, 43, 0.2); }
+  h3 { margin-top: 0; margin-bottom: 12px; color: #fff; border-bottom: 1px solid #333; padding-bottom: 5px;}
+  p { margin: 6px 0; font-size: 14px; }
+  input, select { background: #222; border: 1px solid #ff2b2b; color: #fff; padding: 8px; font-family: monospace; border-radius: 4px; margin-top: 5px; width: 90%; }
+  button.action-btn { width: 100%; margin-top: 8px; padding: 12px; color: #000; border: none; font-weight: bold; border-radius: 4px; cursor: pointer; font-family: monospace; font-size: 14px; }
+  .btn-focus { background: #00f0ff; }
+  .btn-tank { background: #39ff14; }
+  .btn-social { background: #ff00ff; }
+  .btn-attack { background: #ff2b2b; color: #fff; text-shadow: 0 0 5px #000; }
+  .btn-currency { background: #ffcc00; }
+  .btn-danger { background: #551111; color: #ff2b2b; border: 1px solid #ff2b2b; }
+  .btn-disabled { background: #333 !important; color: #666 !important; cursor: not-allowed; }
+  .checkbox-item { display: flex; align-items: center; justify-content: space-between; margin: 8px 0; font-size: 14px; }
+  .bar-bg { background: #222; width: 100%; height: 12px; border-radius: 6px; margin-bottom: 10px; overflow: hidden; border: 1px solid #444; }
+  .bar-fill { height: 100%; width: 0%; transition: width 0.3s ease; }
+  .xp-fill { background: #00f0ff; }
+  .stability-fill { background: #39ff14; }
+  .boss-fill { background: #ff2b2b; }
+  #burnoutWarning { color: #ff2b2b; font-weight: bold; text-align: center; display: none; animation: flash 1s infinite alternate; }
+  @keyframes flash { from { opacity: 1; } to { opacity: 0.3; } }
+  textarea { background: #222; border: 1px solid #ff2b2b; color: #fff; padding: 8px; font-family: monospace; border-radius: 4px; margin-top: 5px; width: 90%; resize: vertical; }
+  .inline-inputs { display: flex; gap: 5px; width: 95%; }
+  .inline-inputs input[type="number"] { width: 40%; }
+  .total-matrix { background: #1a1a24; border: 1px dashed #ffcc00; padding: 10px; border-radius: 4px; margin-top: 12px; font-size: 13px; }
+</style>
+</head>
+
+<body>
+
+<div class="header">🩸 BLOODCODE OS // V11</div>
+
+<div class="nav-bar">
+  <button class="tab-btn active" onclick="openTab(event, 'tab-profile')">PROFILE</button>
+  <button class="tab-btn" onclick="openTab(event, 'tab-actions')">ACTIONS</button>
+  <button class="tab-btn" onclick="openTab(event, 'tab-activities')">ACTIVITIES</button>
+  <button class="tab-btn" onclick="openTab(event, 'tab-hygiene')">HYGIENE</button>
+  <button class="tab-btn" onclick="openTab(event, 'tab-faith')">FAITH</button>
+  <button class="tab-btn" onclick="openTab(event, 'tab-groceries')">GROCERIES</button>
+  <button class="tab-btn" onclick="openTab(event, 'tab-boss')">COMBAT</button>
+  <button class="tab-btn" onclick="openTab(event, 'tab-shop')">BANK & SHOP</button>
+</div>
+
+<div id="tab-profile" class="tab-content active">
+  <div class="card">
+    <h3>🧍 CORE PROFILE</h3>
+    <p>Level: <span id="level"></span> | Class: <span id="class"></span></p>
+    <p>XP: <span id="xp"></span>/100</p>
+    <div class="bar-bg"><div class="bar-fill xp-fill" id="xpBar"></div></div>
+  </div>
+
+  <div class="card">
+    <h3>🧠 EMOTION ENGINE</h3>
+    <p>Mood: <span id="mood"></span></p>
+    <select onchange="state.mood = this.value; save(); render();" id="moodSelect">
+        <option value="Neutral">Neutral</option>
+        <option value="Locked In">Locked In</option>
+        <option value="Pumped">Pumped</option>
+        <option value="Vibing">Vibing</option>
+        <option value="Stressed">⚠️ Stressed (XP Penalty Active)</option>
+        <option value="Sluggish">⚠️ Sluggish (XP Penalty Active)</option>
+        <option value="Depressed">⚡ Depressed (Resilience Multiplier Active!)</option>
+    </select>
+    <p style="margin-top:10px;">Stability: <span id="stability"></span>%</p>
+    <div class="bar-bg"><div class="bar-fill stability-fill" id="stabilityBar"></div></div>
+    <p id="burnoutWarning">⚠️ CRITICAL BURNOUT ENGINE ACTIVE</p>
+  </div>
+
+  <div class="card">
+    <h3>🧬 SKILL SYSTEM</h3>
+    <p>Focus: <span id="focus"></span> | Chaos: <span id="chaos"></span></p>
+    <p>Tank: <span id="tank"></span> | Social: <span id="social"></span></p>
+  </div>
+
+  <button class="action-btn btn-danger" onclick="rollBackToYesterday()">☣️ HARD PURGE (RESET TASKS & WATER)</button>
+</div>
+
+<div id="tab-actions" class="tab-content">
+  <div class="card">
+    <h3>⚡ CHORE TERMINAL</h3>
+    <div style="margin-bottom: 15px; display: grid; gap: 5px;">
+      <button class="action-btn btn-focus" style="font-size: 12px; padding: 6px;" onclick="addPrecreatedChore('🧹 Clean Room')">+ 🧹 Clean Room</button>
+      <button class="action-btn btn-focus" style="font-size: 12px; padding: 6px;" onclick="addPrecreatedChore('🗑️ Take Out Trash')">+ 🗑️ Take Out Trash</button>
+      <button class="action-btn btn-focus" style="font-size: 12px; padding: 6px;" onclick="addPrecreatedChore('🍽️ Do Dishes')">+ 🍽️ Do Dishes</button>
+      <button class="action-btn btn-focus" style="font-size: 12px; padding: 6px;" onclick="addPrecreatedChore('🧺 Do Laundry')">+ 🧺 Do Laundry</button>
+    </div>
+    <input type="text" id="choreInput" placeholder="New Custom Task...">
+    <button class="action-btn btn-tank" onclick="addChore()">Add Task</button>
+    <div id="choreList" style="margin-top:15px;"></div>
+  </div>
+
+  <div class="card">
+    <h3>🥩 NUTRIENT PROCESSOR</h3>
+    <button class="action-btn btn-tank" onclick="logMeal(true)">🥦 Clean Fuel (+15 XP, +5 Stability)</button>
+    <button class="action-btn btn-danger" onclick="logMeal(false)">🍟 Junk Fuel / Skipped Meal (-15 Stability)</button>
+    <div style="margin-top: 15px; border-top: 1px solid #333; padding-top: 10px;">
+      <p>🚰 Water Intake: <span id="waterValue">0</span> / 8 Cups</p>
+      <button class="action-btn btn-focus" onclick="logWater()">💧 Drink Water (+5 XP, +2 Stability)</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🎮 CORE MISSIONS</h3>
+    <button class="action-btn btn-focus" onclick="runAction('focus')">💻 Deep Work (+Focus, -Stability)</button>
+    <button class="action-btn btn-tank" onclick="runAction('tank')">🏋️ Gym Training (+Tank, +Stability)</button>
+    <button class="action-btn btn-social" onclick="runAction('social')">🍻 Social Vector (+Social)</button>
+  </div>
+</div>
+
+<div id="tab-activities" class="tab-content">
+  <div class="card">
+    <h3>📚 LEISURE & LEARNING</h3>
+    <button class="action-btn btn-focus" onclick="logActivity('read')">📖 Read a Book (+20 XP, +Focus, +5 Stability)</button>
+    <button class="action-btn btn-social" onclick="logActivity('game')">🎮 Play Video Game (+15 XP, +15 Stability)</button>
+    <button class="action-btn btn-tank" onclick="logActivity('instrument')">🎸 Practice Instrument (+25 XP, +Focus, +10 Stability)</button>
+    <button class="action-btn btn-social" onclick="logActivity('show')">📺 Watch a Show (+10 XP, +20 Stability)</button>
+  </div>
+
+  <div class="card">
+    <h3>💼 THE GRIND</h3>
+    <button class="action-btn btn-danger" onclick="logActivity('work')">🏢 Do Work (+40 XP, +Focus, -20 Stability)</button>
+    <button class="action-btn btn-focus" onclick="logActivity('study')">📝 Study (+35 XP, +Focus, -15 Stability)</button>
+  </div>
+</div>
+
+<div id="tab-hygiene" class="tab-content">
+  <div class="card">
+    <h3>🧼 DECONTAMINATION PROTOCOLS</h3>
+    <button class="action-btn btn-focus" onclick="logHygiene('shower')">🚿 Take a Shower (+25 XP, +15 Stability)</button>
+    <button class="action-btn btn-tank" onclick="logHygiene('teeth')">🪥 Brush Teeth (+10 XP, +5 Stability)</button>
+    <button class="action-btn btn-social" onclick="logHygiene('hair')">🪮 Brush Hair (+10 XP, +5 Stability)</button>
+    <button class="action-btn btn-focus" onclick="logHygiene('day_dress')">👕 Get Dressed (Daytime) (+15 XP, +10 Stability)</button>
+    <button class="action-btn btn-social" onclick="logHygiene('bed_dress')">🛏️ Get Dressed (Bedtime) (+15 XP, +10 Stability)</button>
+    <button class="action-btn btn-tank" onclick="logHygiene('hands')">🧼 Wash Hands (+5 XP, +2 Stability)</button>
+    <button class="action-btn btn-focus" onclick="logHygiene('face')">🧼 Wash Face (+10 XP, +5 Stability)</button>
+  </div>
+</div>
+
+<div id="tab-faith" class="tab-content">
+  <div class="card">
+    <h3>🙏 SPIRITUAL LITURGY</h3>
+    <button class="action-btn btn-focus" onclick="logFaith('rosary')">📿 Pray the Rosary (+30 XP, +15 Stability)</button>
+    <button class="action-btn btn-focus" onclick="logFaith('mercy')">❤️ Divine Mercy Chaplet (+20 XP, +10 Stability)</button>
+    <button class="action-btn btn-tank" onclick="logFaith('mass')">⛪ Attend Holy Mass (+45 XP, +25 Stability)</button>
+    <button class="action-btn btn-tank" onclick="logFaith('adoration')">🧎 Eucharistic Adoration (+35 XP, +20 Stability)</button>
+    <button class="action-btn btn-currency" onclick="logFaith('communion')">🍞 Receive Communion (+25 XP, +15 Stability)</button>
+    <button class="action-btn btn-danger" onclick="logFaith('confession')">🕊️ Go to Confession (+40 XP, +30 Stability)</button>
+    <button class="action-btn btn-social" onclick="logFaith('prayer')">🤲 Basic Prayer (+10 XP, +5 Stability)</button>
+  </div>
+
+  <div class="card">
+    <h3>📜 HAGIOGRAPHY MATRIX (SAINT REVIEW)</h3>
+    <p>Write a review or analysis of a Saint's life. Rewards scale with word counts.</p>
+    <input type="text" id="saintName" placeholder="Saint Name...">
+    <textarea id="saintReview" rows="5" placeholder="Write entry details here..."></textarea>
+    <button class="action-btn btn-tank" onclick="submitSaintReview()">Submit Hagiography Entry</button>
+  </div>
+</div>
+
+<div id="tab-groceries" class="tab-content">
+  <div class="card">
+    <h3>🛒 GROCERY MATRIX</h3>
+    <p>Checking off purchased stock will automatically log its estimated cost as an expense in your Budget Ledger.</p>
+    <div style="margin-bottom: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+      <button class="action-btn btn-tank" style="font-size: 11px; padding: 6px;" onclick="addPrecreatedGrocery('🥩 Proteins', 15.00)">+ 🥩 Proteins ($15)</button>
+      <button class="action-btn btn-tank" style="font-size: 11px; padding: 6px;" onclick="addPrecreatedGrocery('🥦 Veggies', 6.00)">+ 🥦 Veggies ($6)</button>
+      <button class="action-btn btn-tank" style="font-size: 11px; padding: 6px;" onclick="addPrecreatedGrocery('🍞 Carbs/Grains', 4.50)">+ 🍞 Carbs ($4.50)</button>
+      <button class="action-btn btn-focus" style="font-size: 11px; padding: 6px;" onclick="addPrecreatedGrocery('🚰 Water Case', 5.00)">+ 🚰 Water ($5)</button>
+    </div>
+    <div class="inline-inputs">
+      <input type="text" id="groceryInput" placeholder="Item manifest name...">
+      <input type="number" id="groceryPriceInput" placeholder="Est. $" step="0.01">
+    </div>
+    <button class="action-btn btn-currency" onclick="addGrocery()">Add Target Item</button>
+    
+    <div class="total-matrix">
+      <div>📊 Total List Value: <b style="color:#fff;">$<span id="totalListValue">0.00</span></b></div>
+      <div style="margin-top: 4px;">⏳ Unpurchased Balance: <b style="color:#ffcc00;">$<span id="unpurchasedValue">0.00</span></b></div>
+    </div>
+
+    <div id="groceryList" style="margin-top:15px;"></div>
+  </div>
+</div>
+
+<div id="tab-boss" class="tab-content">
+  <div class="card">
+    <h3>🧟 BURNOUT DEMON : PHASE <span id="phase"></span></h3>
+    <p>HP: <span id="boss"></span> / <span id="bossMax"></span></p>
+    <div class="bar-bg"><div class="bar-fill boss-fill" id="bossBar"></div></div>
+    <button id="attackBtn" class="action-btn btn-attack" onclick="attackBoss()">⚔️ Execute Boss Attack (-5 Stability)</button>
+  </div>
+</div>
+
+<div id="tab-shop" class="tab-content">
+  <div class="card">
+    <h3>💳 BUDGET MATRIX</h3>
+    <p>Current Credits: <b style="color:#39ff14;">$<span id="balance">0.00</span></b></p>
+    <div style="margin-top:10px;">
+      <input type="number" id="budgetAmount" placeholder="Amount ($)">
+      <select id="budgetType">
+        <option value="income">➕ Log Income</option>
+        <option value="expense">➖ Log Expense</option>
+      </select>
+      <button class="action-btn btn-currency" onclick="processTransaction()">Execute Ledger entry</button>
+      <button class="action-btn btn-danger" style="margin-top: 15px;" onclick="resetLedgerBalance()">🔄 RESET BUDGET CYCLE ($0.00)</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🏪 BLACK MARKET</h3>
+    <p>Available Game XP: <span id="xpShop"></span></p>
+    <button class="action-btn btn-tank" onclick="buyUpgrade()">💉 Stability Patch (Costs 20 XP)</button>
+  </div>
+</div>
+
+<script>
+/* ---------------- STATE MANAGEMENT ---------------- */
+const defaultState = {
+  level: 1, xp: 0, stability: 0, mood: "Neutral",
+  skills: { focus: 1, chaos: 1, tank: 1, social: 1 },
+  class: "Unassigned", bossHp: 100, bossMaxHp: 100, phase: 1,
+  balance: 0.00, chores: [], groceries: [],
+  water: 0,
+  lastLoginDate: ""
+};
+
+let state;
+try {
+  const saved = localStorage.getItem("bloodcode_v11");
+  state = saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(defaultState));
+  if(state.chores === undefined) state.chores = [];
+  if(state.groceries === undefined) state.groceries = [];
+  if(state.water === undefined) state.water = 0;
+  if(state.stability === undefined) state.stability = 0;
+} catch (e) { 
+  state = JSON.parse(JSON.stringify(defaultState)); 
+}
+
+const todayString = new Date().toDateString();
+if (state.lastLoginDate && state.lastLoginDate !== todayString) {
+  localStorage.setItem("bloodcode_v11_yesterday", JSON.stringify(state));
+  state.water = 0; 
+}
+state.lastLoginDate = todayString;
+localStorage.setItem("bloodcode_v11", JSON.stringify(state));
+
+function save() { localStorage.setItem("bloodcode_v11", JSON.stringify(state)); }
+
+/* ---------------- NAVIGATION ---------------- */
+function openTab(evt, tabName) {
+  let tabContents = document.getElementsByClassName("tab-content");
+  for (let i = 0; i < tabContents.length; i++) { tabContents[i].classList.remove("active"); }
+  let tabBtns = document.getElementsByClassName("tab-btn");
+  for (let i = 0; i < tabBtns.length; i++) { tabBtns[i].classList.remove("active"); }
+  document.getElementById(tabName).classList.add("active");
+  evt.currentTarget.classList.add("active");
+}
+
+/* ---------------- CORE MODIFIER LOGIC ---------------- */
+function modifyXP(amount) {
+  if (state.mood === "Depressed") {
+    state.xp += Math.floor(amount * 1.5);
+    checkLevelUp();
+  } else if (state.mood === "Stressed" || state.mood === "Sluggish") {
+    state.xp -= Math.abs(amount); 
+    if (state.xp < 0) state.xp = 0; 
+  } else {
+    state.xp += amount; 
+    checkLevelUp();
+  }
+}
+
+function handleStabilityGain(amount) {
+  if (state.mood === "Depressed") {
+    state.stability += (amount * 2);
+  } else {
+    state.stability += amount;
+  }
+  sanitizeBars();
+}
+
+/* ---------------- CHORE LOGIC ---------------- */
+function addChore() {
+  const input = document.getElementById("choreInput");
+  if(input.value.trim() === "") return;
+  state.chores.push({ text: input.value, done: false });
+  input.value = "";
+  save(); render();
+}
+
+function addPrecreatedChore(taskText) {
+  state.chores.push({ text: taskText, done: false });
+  save(); render();
+}
+
+function toggleChore(index) {
+  state.chores[index].done = !state.chores[index].done;
+  if(state.chores[index].done) { 
+    modifyXP(10); 
+    handleStabilityGain(5);
+  }
+  save(); render();
+}
+
+function removeChore(index) {
+  state.chores.splice(index, 1);
+  save(); render();
+}
+
+/* ---------------- GROCERY LOGIC ---------------- */
+function addGrocery() {
+  const nameInput = document.getElementById("groceryInput");
+  const priceInput = document.getElementById("groceryPriceInput");
+  const price = parseFloat(priceInput.value) || 0.00;
+  if(nameInput.value.trim() === "") return;
+  state.groceries.push({ text: nameInput.value, price: price, done: false });
+  nameInput.value = "";
+  priceInput.value = "";
+  save(); render();
+}
+
+function addPrecreatedGrocery(itemText, estPrice) {
+  state.groceries.push({ text: itemText, price: estPrice, done: false });
+  save(); render();
+}
+
+function toggleGrocery(index) {
+  const item = state.groceries[index];
+  item.done = !item.done;
+  if(item.done) {
+    modifyXP(5);
+    handleStabilityGain(2);
+    state.balance -= item.price; 
+    if (state.balance < 0) { state.stability -= 25; state.mood = "Financial Crisis"; }
+  } else {
+    state.balance += item.price; 
+  }
+  sanitizeBars(); save(); render();
+}
+
+function removeGrocery(index) {
+  state.groceries.splice(index, 1);
+  save(); render();
+}
+
+/* ---------------- CORE ENGINE ---------------- */
+function assignClass() {
+  const s = state.skills;
+  if (s.focus >= s.chaos && s.focus >= s.tank) state.class = "Focus Runner";
+  else if (s.chaos > s.focus) state.class = "Chaos Breaker";
+  else if (s.tank > s.focus && s.tank > s.social) state.class = "Tank Core";
+  else state.class = "Social Engine";
+}
+
+function runAction(type) {
+  if (type === 'focus') { modifyXP(30); state.skills.focus++; state.stability -= 15; state.mood = "Locked In"; } 
+  else if (type === 'tank') { modifyXP(20); state.skills.tank++; handleStabilityGain(10); state.mood = "Pumped"; }
+  else if (type === 'social') { modifyXP(15); state.skills.social++; handleStabilityGain(5); state.mood = "Vibing"; }
+  if (Math.random() > 0.8) { state.stability -= 10; state.skills.chaos++; state.mood = "Stressed"; }
+  sanitizeBars(); assignClass(); save(); render();
+}
+
+function logActivity(type) {
+  switch(type) {
+    case 'read':
+      modifyXP(20); state.skills.focus++; handleStabilityGain(5); state.mood = "Locked In"; break;
+    case 'game':
+      modifyXP(15); handleStabilityGain(15); state.mood = "Vibing"; break;
+    case 'instrument':
+      modifyXP(25); state.skills.focus++; handleStabilityGain(10); state.mood = "Pumped"; break;
+    case 'show':
+      modifyXP(10); handleStabilityGain(20); state.mood = "Vibing"; break;
+    case 'work':
+      modifyXP(40); state.skills.focus++; state.stability -= 20; state.mood = "Stressed"; break;
+    case 'study':
+      modifyXP(35); state.skills.focus++; state.stability -= 15; state.mood = "Locked In"; break;
+  }
+  sanitizeBars(); assignClass(); save(); render();
+}
+
+function logMeal(isClean) {
+  if(isClean) { modifyXP(15); handleStabilityGain(10); state.mood = "Fueled"; }
+  else { state.stability -= 20; state.mood = "Sluggish"; }
+  sanitizeBars(); save(); render();
+}
+
+function logWater() {
+  state.water++;
+  modifyXP(5);
+  handleStabilityGain(2);
+  sanitizeBars(); save(); render();
+}
+
+function logHygiene(type) {
+  switch(type) {
+    case 'shower':
+      modifyXP(25); handleStabilityGain(15); state.mood = "Vibing"; break;
+    case 'teeth':
+      modifyXP(10); handleStabilityGain(5); state.mood = "Neutral"; break;
+    case 'hair':
+      modifyXP(10); handleStabilityGain(5); state.mood = "Neutral"; break;
+    case 'day_dress':
+      modifyXP(15); handleStabilityGain(10); state.mood = "Pumped"; break;
+    case 'bed_dress':
+      modifyXP(15); handleStabilityGain(10); state.mood = "Vibing"; break;
+    case 'hands':
+      modifyXP(5); handleStabilityGain(2); state.mood = "Neutral"; break;
+    case 'face':
+      modifyXP(10); handleStabilityGain(5); state.mood = "Neutral"; break;
+  }
+  sanitizeBars(); save(); render();
+}
+
+function logFaith(type) {
+  switch(type) {
+    case 'rosary':
+      modifyXP(30); handleStabilityGain(15); state.mood = "Locked In"; break;
+    case 'mercy':
+      modifyXP(20); handleStabilityGain(10); state.mood = "Neutral"; break;
+    case 'mass':
+      modifyXP(45); handleStabilityGain(25); state.mood = "Vibing"; break;
+    case 'adoration':
+      modifyXP(35); handleStabilityGain(20); state.mood = "Locked In"; break;
+    case 'communion':
+      modifyXP(25); handleStabilityGain(15); state.mood = "Fueled"; break;
+    case 'confession':
+      modifyXP(40); handleStabilityGain(30); state.mood = "Pumped"; break;
+    case 'prayer':
+      modifyXP(10); handleStabilityGain(5); state.mood = "Neutral"; break;
+  }
+  sanitizeBars(); save(); render();
+}
+
+function submitSaintReview() {
+  const nameInput = document.getElementById("saintName");
+  const reviewInput = document.getElementById("saintReview");
+  const reviewText = reviewInput.value.trim();
+  
+  if (nameInput.value.trim() === "" || reviewText === "") return;
+  
+  const words = reviewText.split(/\s+/).filter(w => w.length > 0).length;
+  
+  const calculatedXp = Math.min(100, 15 + Math.floor(words * 0.4));
+  const calculatedStability = Math.min(50, 5 + Math.floor(words * 0.2));
+  
+  modifyXP(calculatedXp);
+  handleStabilityGain(calculatedStability);
+  state.mood = "Locked In";
+  
+  nameInput.value = "";
+  reviewInput.value = "";
+  
+  alert(`🧬 Hagiography Logged successfully.`);
+  sanitizeBars(); save(); render();
+}
+
+function processTransaction() {
+  const amtInput = document.getElementById("budgetAmount");
+  const amt = parseFloat(amtInput.value);
+  const type = document.getElementById("budgetType").value;
+  if (isNaN(amt) || amt <= 0) return;
+  if (type === "income") { state.balance += amt; handleStabilityGain(5); }
+  else { state.balance -= amt; if (state.balance < 0) { state.stability -= 25; state.mood = "Financial Crisis"; } }
+  amtInput.value = "";
+  sanitizeBars(); save(); render();
+}
+
+function resetLedgerBalance() {
+  if (confirm("Reset current credit ledger to $0.00 for the new budget cycle?")) {
+    state.balance = 0.00;
+    save();
+    render();
+    alert("💳 Budget Matrix reset successful.");
+  }
+}
+
+function attackBoss() {
+  if (state.stability < 20) return;
+  state.bossHp -= (10 + state.skills.focus + state.skills.tank);
+  state.stability -= 5;
+  if (state.bossHp <= 0) { 
+    state.phase++; 
+    state.bossMaxHp = 100 + (state.phase * 50); 
+    state.bossHp = state.bossMaxHp; 
+    state.level++; 
+    alert("💀 Threat Purged! Tier Shift Complete."); 
+  }
+  sanitizeBars(); save(); render();
+}
+
+function buyUpgrade() {
+  if (state.xp >= 20) { state.xp -= 20; handleStabilityGain(35); }
+  sanitizeBars(); save(); render();
+}
+
+function sanitizeBars() { if (state.stability > 100) state.stability = 100; if (state.stability < 0) state.stability = 0; }
+
+function checkLevelUp() { 
+  if (state.xp >= 100) { 
+    state.xp -= 100; 
+    state.level++; 
+    alert("🧬 System Update: Level Up."); 
+  } 
+}
+
+function rollBackToYesterday() {
+  if (confirm("Execute hard purge? This clears your active tasks and resets your water intake counter, but your accumulated XP, Level, Skills system, and Bank balance will stay completely untouched.")) {
+    state.chores = [];
+    state.water = 0;
+    save();
+    render();
+    alert("🔄 Matrix initialized successfully.");
+  }
+}
+
+/* ---------------- RENDER ---------------- */
+function render() {
+  document.getElementById("level").innerText = state.level;
+  document.getElementById("xp").innerText = state.xp;
+  document.getElementById("class").innerText = state.class;
+  document.getElementById("mood").innerText = state.mood;
+  document.getElementById("moodSelect").value = state.mood;
+  document.getElementById("stability").innerText = state.stability;
+  document.getElementById("focus").innerText = state.skills.focus;
+  document.getElementById("chaos").innerText = state.skills.chaos;
+  document.getElementById("tank").innerText = state.skills.tank;
+  document.getElementById("social").innerText = state.skills.social;
+  document.getElementById("phase").innerText = state.phase;
+  document.getElementById("boss").innerText = state.bossHp;
+  document.getElementById("bossMax").innerText = state.bossMaxHp;
+  document.getElementById("xpShop").innerText = state.xp;
+  document.getElementById("balance").innerText = state.balance.toFixed(2);
+  document.getElementById("waterValue").innerText = state.water;
+  
+  document.getElementById("xpBar").style.width = state.xp + "%";
+  document.getElementById("stabilityBar").style.width = state.stability + "%";
+  document.getElementById("bossBar").style.width = ((state.bossHp / state.bossMaxHp) * 100) + "%";
+  
+  // Chores Render
+  const list = document.getElementById("choreList");
+  list.innerHTML = "";
+  state.chores.forEach((c, i) => {
+    list.innerHTML += `<div class="checkbox-item">
+      <span onclick="toggleChore(${i})" style="cursor:pointer; color:${c.done ? '#666' : '#fff'}; text-decoration:${c.done ? 'line-through' : 'none'}">${c.text}</span>
+      <button onclick="removeChore(${i})" style="background:none; border:none; color:#ff2b2b; cursor:pointer; font-weight:bold;">X</button>
+    </div>`;
+  });
+
+  // Calculate and Render Grocery Values
+  let absoluteTotal = 0;
+  let remainingTotal = 0;
+
+  const gList = document.getElementById("groceryList");
+  gList.innerHTML = "";
+  state.groceries.forEach((g, i) => {
+    absoluteTotal += g.price;
+    if (!g.done) {
+      remainingTotal += g.price;
+    }
+
+    gList.innerHTML += `<div class="checkbox-item">
+      <span onclick="toggleGrocery(${i})" style="cursor:pointer; color:${g.done ? '#666' : '#fff'}; text-decoration:${g.done ? 'line-through' : 'none'}">
+        ${g.text} <small style="color:#ffcc00;">($${g.price.toFixed(2)})</small>
+      </span>
+      <button onclick="removeGrocery(${i})" style="background:none; border:none; color:#ff2b2b; cursor:pointer; font-weight:bold;">X</button>
+    </div>`;
+  });
+
+  document.getElementById("totalListValue").innerText = absoluteTotal.toFixed(2);
+  document.getElementById("unpurchasedValue").innerText = remainingTotal.toFixed(2);
+
+  if (state.stability < 20) {
+    document.getElementById("burnoutWarning").style.display = "block";
+    document.getElementById("stabilityBar").style.background = "#ff2b2b";
+  } else {
+    document.getElementById("burnoutWarning").style.display = "none";
+    document.getElementById("stabilityBar").style.background = "#39ff14";
+  }
+}
+
+assignClass();
+render();
+</script>
+</body>
+</html>
