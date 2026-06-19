@@ -34,6 +34,9 @@
   #burnoutWarning { color: #ff2b2b; font-weight: bold; text-align: center; display: none; animation: flash 1s infinite alternate; }
   @keyframes flash { from { opacity: 1; } to { opacity: 0.3; } }
   textarea { background: #222; border: 1px solid #ff2b2b; color: #fff; padding: 8px; font-family: monospace; border-radius: 4px; margin-top: 5px; width: 90%; resize: vertical; }
+  .inline-inputs { display: flex; gap: 5px; width: 95%; }
+  .inline-inputs input[type="number"] { width: 40%; }
+  .total-matrix { background: #1a1a24; border: 1px dashed #ffcc00; padding: 10px; border-radius: 4px; margin-top: 12px; font-size: 13px; }
 </style>
 </head>
 
@@ -47,6 +50,7 @@
   <button class="tab-btn" onclick="openTab(event, 'tab-activities')">ACTIVITIES</button>
   <button class="tab-btn" onclick="openTab(event, 'tab-hygiene')">HYGIENE</button>
   <button class="tab-btn" onclick="openTab(event, 'tab-faith')">FAITH</button>
+  <button class="tab-btn" onclick="openTab(event, 'tab-groceries')">GROCERIES</button>
   <button class="tab-btn" onclick="openTab(event, 'tab-boss')">COMBAT</button>
   <button class="tab-btn" onclick="openTab(event, 'tab-shop')">BANK & SHOP</button>
 </div>
@@ -69,7 +73,7 @@
         <option value="Vibing">Vibing</option>
         <option value="Stressed">⚠️ Stressed (XP Penalty Active)</option>
         <option value="Sluggish">⚠️ Sluggish (XP Penalty Active)</option>
-        <option value="Depressed">⚠️ Depressed (XP Penalty Active)</option>
+        <option value="Depressed">⚡ Depressed (Resilience Multiplier Active!)</option>
     </select>
     <p style="margin-top:10px;">Stability: <span id="stability"></span>%</p>
     <div class="bar-bg"><div class="bar-fill stability-fill" id="stabilityBar"></div></div>
@@ -167,6 +171,31 @@
   </div>
 </div>
 
+<div id="tab-groceries" class="tab-content">
+  <div class="card">
+    <h3>🛒 GROCERY MATRIX</h3>
+    <p>Checking off purchased stock will automatically log its estimated cost as an expense in your Budget Ledger.</p>
+    <div style="margin-bottom: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+      <button class="action-btn btn-tank" style="font-size: 11px; padding: 6px;" onclick="addPrecreatedGrocery('🥩 Proteins', 15.00)">+ 🥩 Proteins ($15)</button>
+      <button class="action-btn btn-tank" style="font-size: 11px; padding: 6px;" onclick="addPrecreatedGrocery('🥦 Veggies', 6.00)">+ 🥦 Veggies ($6)</button>
+      <button class="action-btn btn-tank" style="font-size: 11px; padding: 6px;" onclick="addPrecreatedGrocery('🍞 Carbs/Grains', 4.50)">+ 🍞 Carbs ($4.50)</button>
+      <button class="action-btn btn-focus" style="font-size: 11px; padding: 6px;" onclick="addPrecreatedGrocery('🚰 Water Case', 5.00)">+ 🚰 Water ($5)</button>
+    </div>
+    <div class="inline-inputs">
+      <input type="text" id="groceryInput" placeholder="Item manifest name...">
+      <input type="number" id="groceryPriceInput" placeholder="Est. $" step="0.01">
+    </div>
+    <button class="action-btn btn-currency" onclick="addGrocery()">Add Target Item</button>
+    
+    <div class="total-matrix">
+      <div>📊 Total List Value: <b style="color:#fff;">$<span id="totalListValue">0.00</span></b></div>
+      <div style="margin-top: 4px;">⏳ Unpurchased Balance: <b style="color:#ffcc00;">$<span id="unpurchasedValue">0.00</span></b></div>
+    </div>
+
+    <div id="groceryList" style="margin-top:15px;"></div>
+  </div>
+</div>
+
 <div id="tab-boss" class="tab-content">
   <div class="card">
     <h3>🧟 BURNOUT DEMON : PHASE <span id="phase"></span></h3>
@@ -204,7 +233,7 @@ const defaultState = {
   level: 1, xp: 0, stability: 0, mood: "Neutral",
   skills: { focus: 1, chaos: 1, tank: 1, social: 1 },
   class: "Unassigned", bossHp: 100, bossMaxHp: 100, phase: 1,
-  balance: 0.00, chores: [],
+  balance: 0.00, chores: [], groceries: [],
   water: 0,
   lastLoginDate: ""
 };
@@ -214,6 +243,7 @@ try {
   const saved = localStorage.getItem("bloodcode_v11");
   state = saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(defaultState));
   if(state.chores === undefined) state.chores = [];
+  if(state.groceries === undefined) state.groceries = [];
   if(state.water === undefined) state.water = 0;
   if(state.stability === undefined) state.stability = 0;
 } catch (e) { 
@@ -223,7 +253,7 @@ try {
 const todayString = new Date().toDateString();
 if (state.lastLoginDate && state.lastLoginDate !== todayString) {
   localStorage.setItem("bloodcode_v11_yesterday", JSON.stringify(state));
-  state.water = 0; // Reset daily water intake on a new day
+  state.water = 0; 
 }
 state.lastLoginDate = todayString;
 localStorage.setItem("bloodcode_v11", JSON.stringify(state));
@@ -240,17 +270,27 @@ function openTab(evt, tabName) {
   evt.currentTarget.classList.add("active");
 }
 
-/* ---------------- HELPER ENGINE: XP MODIFIER ---------------- */
-// Checks if current state contains a negative mood. If true, turns the reward into a penalty.
+/* ---------------- CORE MODIFIER LOGIC ---------------- */
 function modifyXP(amount) {
-  const negativeMoods = ["Stressed", "Sluggish", "Depressed"];
-  if (negativeMoods.includes(state.mood)) {
-    state.xp -= Math.abs(amount); // Lose XP instead of gaining it
-    if (state.xp < 0) state.xp = 0; // Prevent dropping below 0 baseline
+  if (state.mood === "Depressed") {
+    state.xp += Math.floor(amount * 1.5);
+    checkLevelUp();
+  } else if (state.mood === "Stressed" || state.mood === "Sluggish") {
+    state.xp -= Math.abs(amount); 
+    if (state.xp < 0) state.xp = 0; 
   } else {
-    state.xp += amount; // Normal gain
+    state.xp += amount; 
     checkLevelUp();
   }
+}
+
+function handleStabilityGain(amount) {
+  if (state.mood === "Depressed") {
+    state.stability += (amount * 2);
+  } else {
+    state.stability += amount;
+  }
+  sanitizeBars();
 }
 
 /* ---------------- CHORE LOGIC ---------------- */
@@ -271,12 +311,49 @@ function toggleChore(index) {
   state.chores[index].done = !state.chores[index].done;
   if(state.chores[index].done) { 
     modifyXP(10); 
+    handleStabilityGain(5);
   }
   save(); render();
 }
 
 function removeChore(index) {
   state.chores.splice(index, 1);
+  save(); render();
+}
+
+/* ---------------- GROCERY LOGIC ---------------- */
+function addGrocery() {
+  const nameInput = document.getElementById("groceryInput");
+  const priceInput = document.getElementById("groceryPriceInput");
+  const price = parseFloat(priceInput.value) || 0.00;
+  if(nameInput.value.trim() === "") return;
+  state.groceries.push({ text: nameInput.value, price: price, done: false });
+  nameInput.value = "";
+  priceInput.value = "";
+  save(); render();
+}
+
+function addPrecreatedGrocery(itemText, estPrice) {
+  state.groceries.push({ text: itemText, price: estPrice, done: false });
+  save(); render();
+}
+
+function toggleGrocery(index) {
+  const item = state.groceries[index];
+  item.done = !item.done;
+  if(item.done) {
+    modifyXP(5);
+    handleStabilityGain(2);
+    state.balance -= item.price; 
+    if (state.balance < 0) { state.stability -= 25; state.mood = "Financial Crisis"; }
+  } else {
+    state.balance += item.price; 
+  }
+  sanitizeBars(); save(); render();
+}
+
+function removeGrocery(index) {
+  state.groceries.splice(index, 1);
   save(); render();
 }
 
@@ -291,8 +368,8 @@ function assignClass() {
 
 function runAction(type) {
   if (type === 'focus') { modifyXP(30); state.skills.focus++; state.stability -= 15; state.mood = "Locked In"; } 
-  else if (type === 'tank') { modifyXP(20); state.skills.tank++; state.stability += 10; state.mood = "Pumped"; }
-  else if (type === 'social') { modifyXP(15); state.skills.social++; state.stability += 5; state.mood = "Vibing"; }
+  else if (type === 'tank') { modifyXP(20); state.skills.tank++; handleStabilityGain(10); state.mood = "Pumped"; }
+  else if (type === 'social') { modifyXP(15); state.skills.social++; handleStabilityGain(5); state.mood = "Vibing"; }
   if (Math.random() > 0.8) { state.stability -= 10; state.skills.chaos++; state.mood = "Stressed"; }
   sanitizeBars(); assignClass(); save(); render();
 }
@@ -300,13 +377,13 @@ function runAction(type) {
 function logActivity(type) {
   switch(type) {
     case 'read':
-      modifyXP(20); state.skills.focus++; state.stability += 5; state.mood = "Locked In"; break;
+      modifyXP(20); state.skills.focus++; handleStabilityGain(5); state.mood = "Locked In"; break;
     case 'game':
-      modifyXP(15); state.stability += 15; state.mood = "Vibing"; break;
+      modifyXP(15); handleStabilityGain(15); state.mood = "Vibing"; break;
     case 'instrument':
-      modifyXP(25); state.skills.focus++; state.stability += 10; state.mood = "Pumped"; break;
+      modifyXP(25); state.skills.focus++; handleStabilityGain(10); state.mood = "Pumped"; break;
     case 'show':
-      modifyXP(10); state.stability += 20; state.mood = "Vibing"; break;
+      modifyXP(10); handleStabilityGain(20); state.mood = "Vibing"; break;
     case 'work':
       modifyXP(40); state.skills.focus++; state.stability -= 20; state.mood = "Stressed"; break;
     case 'study':
@@ -316,7 +393,7 @@ function logActivity(type) {
 }
 
 function logMeal(isClean) {
-  if(isClean) { modifyXP(15); state.stability += 10; state.mood = "Fueled"; }
+  if(isClean) { modifyXP(15); handleStabilityGain(10); state.mood = "Fueled"; }
   else { state.stability -= 20; state.mood = "Sluggish"; }
   sanitizeBars(); save(); render();
 }
@@ -324,26 +401,26 @@ function logMeal(isClean) {
 function logWater() {
   state.water++;
   modifyXP(5);
-  state.stability += 2;
+  handleStabilityGain(2);
   sanitizeBars(); save(); render();
 }
 
 function logHygiene(type) {
   switch(type) {
     case 'shower':
-      modifyXP(25); state.stability += 15; state.mood = "Vibing"; break;
+      modifyXP(25); handleStabilityGain(15); state.mood = "Vibing"; break;
     case 'teeth':
-      modifyXP(10); state.stability += 5; state.mood = "Neutral"; break;
+      modifyXP(10); handleStabilityGain(5); state.mood = "Neutral"; break;
     case 'hair':
-      modifyXP(10); state.stability += 5; state.mood = "Neutral"; break;
+      modifyXP(10); handleStabilityGain(5); state.mood = "Neutral"; break;
     case 'day_dress':
-      modifyXP(15); state.stability += 10; state.mood = "Pumped"; break;
+      modifyXP(15); handleStabilityGain(10); state.mood = "Pumped"; break;
     case 'bed_dress':
-      modifyXP(15); state.stability += 10; state.mood = "Vibing"; break;
+      modifyXP(15); handleStabilityGain(10); state.mood = "Vibing"; break;
     case 'hands':
-      modifyXP(5); state.stability += 2; state.mood = "Neutral"; break;
+      modifyXP(5); handleStabilityGain(2); state.mood = "Neutral"; break;
     case 'face':
-      modifyXP(10); state.stability += 5; state.mood = "Neutral"; break;
+      modifyXP(10); handleStabilityGain(5); state.mood = "Neutral"; break;
   }
   sanitizeBars(); save(); render();
 }
@@ -351,19 +428,19 @@ function logHygiene(type) {
 function logFaith(type) {
   switch(type) {
     case 'rosary':
-      modifyXP(30); state.stability += 15; state.mood = "Locked In"; break;
+      modifyXP(30); handleStabilityGain(15); state.mood = "Locked In"; break;
     case 'mercy':
-      modifyXP(20); state.stability += 10; state.mood = "Neutral"; break;
+      modifyXP(20); handleStabilityGain(10); state.mood = "Neutral"; break;
     case 'mass':
-      modifyXP(45); state.stability += 25; state.mood = "Vibing"; break;
+      modifyXP(45); handleStabilityGain(25); state.mood = "Vibing"; break;
     case 'adoration':
-      modifyXP(35); state.stability += 20; state.mood = "Locked In"; break;
+      modifyXP(35); handleStabilityGain(20); state.mood = "Locked In"; break;
     case 'communion':
-      modifyXP(25); state.stability += 15; state.mood = "Fueled"; break;
+      modifyXP(25); handleStabilityGain(15); state.mood = "Fueled"; break;
     case 'confession':
-      modifyXP(40); state.stability += 30; state.mood = "Pumped"; break;
+      modifyXP(40); handleStabilityGain(30); state.mood = "Pumped"; break;
     case 'prayer':
-      modifyXP(10); state.stability += 5; state.mood = "Neutral"; break;
+      modifyXP(10); handleStabilityGain(5); state.mood = "Neutral"; break;
   }
   sanitizeBars(); save(); render();
 }
@@ -377,18 +454,17 @@ function submitSaintReview() {
   
   const words = reviewText.split(/\s+/).filter(w => w.length > 0).length;
   
-  // Dynamic scaling parameters: baseline rewards + bonuses per word counted
   const calculatedXp = Math.min(100, 15 + Math.floor(words * 0.4));
   const calculatedStability = Math.min(50, 5 + Math.floor(words * 0.2));
   
   modifyXP(calculatedXp);
-  state.stability += calculatedStability;
+  handleStabilityGain(calculatedStability);
   state.mood = "Locked In";
   
   nameInput.value = "";
   reviewInput.value = "";
   
-  alert(`🧬 Hagiography Logged: +${calculatedXp} XP, +${calculatedStability} Stability.`);
+  alert(`🧬 Hagiography Logged successfully.`);
   sanitizeBars(); save(); render();
 }
 
@@ -397,7 +473,7 @@ function processTransaction() {
   const amt = parseFloat(amtInput.value);
   const type = document.getElementById("budgetType").value;
   if (isNaN(amt) || amt <= 0) return;
-  if (type === "income") { state.balance += amt; state.stability += 5; }
+  if (type === "income") { state.balance += amt; handleStabilityGain(5); }
   else { state.balance -= amt; if (state.balance < 0) { state.stability -= 25; state.mood = "Financial Crisis"; } }
   amtInput.value = "";
   sanitizeBars(); save(); render();
@@ -408,7 +484,7 @@ function resetLedgerBalance() {
     state.balance = 0.00;
     save();
     render();
-    alert("💳 Budget Matrix reset successful. Ledger balance initialized to $0.00.");
+    alert("💳 Budget Matrix reset successful.");
   }
 }
 
@@ -416,26 +492,38 @@ function attackBoss() {
   if (state.stability < 20) return;
   state.bossHp -= (10 + state.skills.focus + state.skills.tank);
   state.stability -= 5;
-  if (state.bossHp <= 0) { state.phase++; state.bossMaxHp = 100 + (state.phase * 50); state.bossHp = state.bossMaxHp; state.level++; state.stability = 0; alert("💀 Threat Purged!"); }
+  if (state.bossHp <= 0) { 
+    state.phase++; 
+    state.bossMaxHp = 100 + (state.phase * 50); 
+    state.bossHp = state.bossMaxHp; 
+    state.level++; 
+    alert("💀 Threat Purged! Tier Shift Complete."); 
+  }
   sanitizeBars(); save(); render();
 }
 
 function buyUpgrade() {
-  if (state.xp >= 20) { state.xp -= 20; state.stability += 35; }
+  if (state.xp >= 20) { state.xp -= 20; handleStabilityGain(35); }
   sanitizeBars(); save(); render();
 }
 
 function sanitizeBars() { if (state.stability > 100) state.stability = 100; if (state.stability < 0) state.stability = 0; }
-function checkLevelUp() { if (state.xp >= 100) { state.xp -= 100; state.level++; state.stability = 0; alert("🧬 System Update: Level Up."); } }
 
-/* ---------------- THE RECOVERY ENGINE ---------------- */
+function checkLevelUp() { 
+  if (state.xp >= 100) { 
+    state.xp -= 100; 
+    state.level++; 
+    alert("🧬 System Update: Level Up."); 
+  } 
+}
+
 function rollBackToYesterday() {
   if (confirm("Execute hard purge? This clears your active tasks and resets your water intake counter, but your accumulated XP, Level, Skills system, and Bank balance will stay completely untouched.")) {
     state.chores = [];
     state.water = 0;
     save();
     render();
-    alert("🔄 Tasks manifest purged and water counter reset. XP, Level, Skill Matrices, and Financial Balance remain stable.");
+    alert("🔄 Matrix initialized successfully.");
   }
 }
 
@@ -462,6 +550,7 @@ function render() {
   document.getElementById("stabilityBar").style.width = state.stability + "%";
   document.getElementById("bossBar").style.width = ((state.bossHp / state.bossMaxHp) * 100) + "%";
   
+  // Chores Render
   const list = document.getElementById("choreList");
   list.innerHTML = "";
   state.chores.forEach((c, i) => {
@@ -470,6 +559,29 @@ function render() {
       <button onclick="removeChore(${i})" style="background:none; border:none; color:#ff2b2b; cursor:pointer; font-weight:bold;">X</button>
     </div>`;
   });
+
+  // Calculate and Render Grocery Values
+  let absoluteTotal = 0;
+  let remainingTotal = 0;
+
+  const gList = document.getElementById("groceryList");
+  gList.innerHTML = "";
+  state.groceries.forEach((g, i) => {
+    absoluteTotal += g.price;
+    if (!g.done) {
+      remainingTotal += g.price;
+    }
+
+    gList.innerHTML += `<div class="checkbox-item">
+      <span onclick="toggleGrocery(${i})" style="cursor:pointer; color:${g.done ? '#666' : '#fff'}; text-decoration:${g.done ? 'line-through' : 'none'}">
+        ${g.text} <small style="color:#ffcc00;">($${g.price.toFixed(2)})</small>
+      </span>
+      <button onclick="removeGrocery(${i})" style="background:none; border:none; color:#ff2b2b; cursor:pointer; font-weight:bold;">X</button>
+    </div>`;
+  });
+
+  document.getElementById("totalListValue").innerText = absoluteTotal.toFixed(2);
+  document.getElementById("unpurchasedValue").innerText = remainingTotal.toFixed(2);
 
   if (state.stability < 20) {
     document.getElementById("burnoutWarning").style.display = "block";
